@@ -77,20 +77,24 @@ def filter_by_wind_types(df, atbat_df):
     return out_df, out_atbat_df
 
 
+def get_color_dict(events):
+    pass
+
+
 def pitcher_page():
     name = st.sidebar.selectbox(
         'Which pitcher do you want to see?',
         final_df['Pitchers Name'].value_counts().index[:30])
-    pitcher_df = get_sub_df("Pitchers Name", name)
-    pitcher_atbat_df = get_sub_df("Pitchers Name", name, from_df=atbat_df)
+    df = get_sub_df("Pitchers Name", name)
+    atbat_df = get_sub_df("Pitchers Name", name, from_df=final_atbat_df)
 
     # Filtering
     st.sidebar.markdown('## Filtering')
-    pitcher_df, pitcher_atbat_df = filter_since_year(pitcher_df, pitcher_atbat_df)
-    pitcher_df, pitcher_atbat_df = filter_by_wind_types(pitcher_df, pitcher_atbat_df)
+    df, atbat_df = filter_since_year(df, atbat_df)
+    df, atbat_df = filter_by_wind_types(df, atbat_df)
 
-    pitch_type_count = pitcher_df.pitch_type.value_counts()
-    availible_trace_types = list(pitch_type_count.index)
+    pitch_type_count = df.pitch_type.value_counts()
+    availible_pitch_types = list(pitch_type_count.index)
 
     st.markdown('## Pitch type distribution')
     st.write(pie_distribution(counts=pitch_type_count))
@@ -99,29 +103,17 @@ def pitcher_page():
     # st.write(pie_distribution(counts=pitch_type_count))
 
     st.markdown('---\n## Pitch position scatter')
-    selected_trace_types = st.multiselect(
-        'Select the trace types to show',
-        availible_trace_types,
-        default=availible_trace_types[:2])
+    selected_pitch_types = st.multiselect(
+        'Select the pitch types to show',
+        availible_pitch_types,
+        default=availible_pitch_types[:2])
 
-    all_trace_types = list(final_df.pitch_type.value_counts().index)
-    colors = get_random_rgb_colors(len(all_trace_types))
+    all_pitch_types = list(final_df.pitch_type.value_counts().index)
+    colors = get_random_rgb_colors(len(all_pitch_types))
     colors = [f'rgba({c[0]}, {c[1]}, {c[2]}, .4)' for c in colors]
-    type_to_color = {t: c for t, c in zip(all_trace_types, colors)}
+    type_to_color = {t: c for t, c in zip(all_pitch_types, colors)}
 
-    # get data to draw
-    data = []
-    for trace_type in selected_trace_types:
-        color = type_to_color[trace_type]
-        trace = go.Scatter(
-            x=pitcher_df.px[pitcher_df['pitch_type'] == trace_type],
-            y=pitcher_df.pz[pitcher_df['pitch_type'] == trace_type],
-            name=trace_type,
-            mode='markers',
-            marker=dict(size=5, color=color, line=dict(width=2, color=color)))
-        data.append(trace)
-
-    fig = dict(data=data)
+    fig = scatter_zone_on_selected_types(df, 'pitch_type', selected_pitch_types, type_to_color)
     st.write(fig)
 
 
@@ -130,7 +122,7 @@ def batter_page():
         'Which batter do you want to see?',
         final_df['Batters Name'].value_counts().index[:30])
     batter_df = get_sub_df('Batters Name', name)
-    batter_atbat_df = get_sub_df('Batters Name', name, from_df=atbat_df)
+    batter_atbat_df = get_sub_df('Batters Name', name, from_df=final_atbat_df)
 
     # Filtering
     st.sidebar.markdown('## Filtering')
@@ -139,16 +131,22 @@ def batter_page():
 
     st.markdown('### Strike event distribution')
     # code_counts = batter_df['code'].value_counts()
-    event_counts = batter_df['event'].value_counts()
+    event_counts = batter_atbat_df['event'].value_counts()
     st.write(pie_distribution(counts=event_counts))
+    code_counts = batter_atbat_df['code'].value_counts()
+    st.write(pie_distribution(counts=code_counts))
+
+    st.markdown('---\n## Strike zone')
+
+#     # Select codes
+#     availible_event_types = list(event_counts.index)
+#     selected_event_types = st.multiselect('Select the event types to show', availible_event_types,
+#                                           default=availible_event_types[:2])
 
     # Select events
     availible_event_types = list(event_counts.index)
-    st.markdown('---\n## Strike zone')
-    selected_event_types = st.multiselect(
-        'Select the event types to show',
-        availible_event_types,
-        default=availible_event_types[:2])
+    selected_event_types = st.multiselect('Select the event types to show',
+                                          availible_event_types, default=availible_event_types[:2])
 
     # Assign color to each event
     all_event_types = list(final_df.event.value_counts().index)
@@ -156,19 +154,23 @@ def batter_page():
     colors = [f'rgba({c[0]}, {c[1]}, {c[2]}, .4)' for c in colors]
     type_to_color = {t: c for t, c in zip(all_event_types, colors)}
 
-    # get data to draw
+    fig = scatter_zone_on_selected_types(batter_atbat_df, 'event', selected_event_types, type_to_color)
+    st.write(fig)
+
+
+def scatter_zone_on_selected_types(df, key: str, selected_types: list, type_to_color: dict):
     data = []
-    for event_type in selected_event_types:
-        color = type_to_color[event_type]
+    for _type in selected_types:
+        color = type_to_color[_type]
         trace = go.Scatter(
-            x=batter_df.px[batter_df['event'] == event_type],
-            y=batter_df.pz[batter_df['event'] == event_type],
-            name=event_type,
+            x=df.px[df[key] == _type],
+            y=df.pz[df[key] == _type],
+            name=_type,
             mode='markers',
             marker=dict(size=5, color=color, line=dict(width=2, color=color)))
         data.append(trace)
     fig = go.Figure(data=data)
-    st.write(fig)
+    return fig
 
 
 @st.cache
@@ -179,7 +181,7 @@ def get_final_basic_measure(columns):
 NUMERIC_COLUMNS = ['px', 'pz', 'start_speed', 'end_speed', 'spin_rate', 'spin_dir',
                    'break_angle', 'break_length', 'break_y']
 
-final_df, atbat_df = get_df("../input/all_joined.csv.zip")
+final_df, final_atbat_df = get_df("../input/all_joined.csv.zip")
 final_mean, final_std = get_final_basic_measure(NUMERIC_COLUMNS)
 
 st.sidebar.markdown('# Analysis Target')
