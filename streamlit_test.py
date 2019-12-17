@@ -14,6 +14,9 @@ import plotly.figure_factory as ff
 import os
 import random
 
+from mlxtend.frequent_patterns import apriori, association_rules
+from mlxtend import frequent_patterns
+
 
 def random_colors(number_of_colors):
     color = [
@@ -91,6 +94,24 @@ def get_color_dict(all_types):
     return type_to_color
 
 
+def high_correlation(df, atbat_df):
+    continues_causes = ['px', 'pz', 'start_speed', 'end_speed', 'spin_rate', 'spin_dir',
+                        'break_angle', 'break_length', 'break_y', 'inning']
+    categorical_causes = ['pitch_type']
+
+    # Association with code
+    tmp = pd.concat([
+        pd.get_dummies(df[categorical_causes]),
+        pd.get_dummies(df[['code']])
+    ], axis=1)
+    frequent_itemsets = apriori(tmp, min_support=0.05, use_colnames=True)
+    associations = association_rules(
+        frequent_itemsets, metric='confidence', min_threshold=0.1
+    ).sort_values('confidence', ascending=False)
+    associations = associations[[not v.startswith('code_') for v in associations['antecedents']]]
+    st.write(associations)
+
+
 def pitcher_page():
     name = st.sidebar.selectbox(
         'Which pitcher do you want to see?',
@@ -138,18 +159,18 @@ def batter_page():
 
 
 def strike_zone_distribution(df, atbat_df, targets):
-    def select_by_and_draw(df_, key):
+    def select_by_and_draw(df_, key, size=5):
         availible_types = list(df_[key].value_counts().index)
         st.markdown(f'### Select the {key} to show')
         selected_types = st.multiselect('', availible_types, default=availible_types[:2])
         type_to_color = get_color_dict(availible_types)
-        fig = scatter_zone_on_selected_types(df_, key, selected_types, type_to_color)
+        fig = scatter_zone_on_selected_types(df_, key, selected_types, type_to_color, size=size)
         st.write(fig)
 
     if 'pitch_type' in targets:
-        select_by_and_draw(df, 'pitch_type')
+        select_by_and_draw(df, 'pitch_type', size=3)
     if 'code' in targets:
-        select_by_and_draw(df, 'code')
+        select_by_and_draw(df, 'code', size=3)
     if 'event' in targets:
         select_by_and_draw(atbat_df, 'event')
 
