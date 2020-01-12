@@ -15,6 +15,8 @@ pitch/strike events and other conditions.
 Try it here: http://140.112.29.149:8501/
 (will be closed once the final project is finished)
 
+To run the service: `streamlit run streamlit_test.py`
+
 ## Tools
 
 - Streamlit: This is a very convenient python framework to develop ML web tools. It’s
