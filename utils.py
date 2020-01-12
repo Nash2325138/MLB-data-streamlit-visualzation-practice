@@ -65,18 +65,52 @@ def random_colors(number_of_colors):
 
 
 def high_correlation(df, atbat_df):
-    continues_causes = ['px', 'pz', 'start_speed', 'end_speed', 'spin_rate', 'spin_dir',
+    continues_causes = ['start_speed', 'end_speed', 'spin_rate', 'spin_dir',
                         'break_angle', 'break_length', 'break_y', 'inning']
-    categorical_causes = ['pitch_type']
+    categorical_causes = ['pitch_type', 'wind_types']
 
     # Association with code
-    tmp = pd.concat([
-        pd.get_dummies(df[categorical_causes]),
-        pd.get_dummies(df[['code']])
-    ], axis=1)
-    frequent_itemsets = apriori(tmp, min_support=0.05, use_colnames=True)
-    associations = association_rules(
-        frequent_itemsets, metric='confidence', min_threshold=0.1
-    ).sort_values('confidence', ascending=False)
-    associations = associations[[not v.startswith('code_') for v in associations['antecedents']]]
-    st.write(associations)
+    def calc_and_show_association(df_, key):
+        tmp = pd.concat([
+            pd.get_dummies(df_[categorical_causes]),
+            pd.get_dummies(df_[[key]])
+        ], axis=1)
+        frequent_itemsets = apriori(tmp, min_support=0.05, use_colnames=True)
+        associations = association_rules(
+            frequent_itemsets, metric='confidence', min_threshold=0.2
+        ).sort_values('confidence', ascending=False)
+        associations = associations[[
+            all([t.startswith(f'{key}_') for t in v])
+            for v in associations['consequents']
+        ]]
+        associations['antecedents'] = [set(a) for a in associations['antecedents']]
+        associations['consequents'] = [set(a) for a in associations['consequents']]
+        del associations['leverage']
+        del associations['conviction']
+        st.table(associations)
+
+    st.markdown('---\n ### Notable association')
+    calc_and_show_association(df, 'code')
+    calc_and_show_association(atbat_df, 'event')
+
+    def calc_and_show_correlation(df_, key):
+        out_one_hot = pd.get_dummies(df_[key])
+        continues_cause_df = df_[continues_causes]
+        corrs = pd.concat([continues_cause_df, out_one_hot], axis=1).corr()
+        corrs = corrs.loc[continues_cause_df.columns, out_one_hot.columns]
+        corrs_list = [
+            (r, c, corrs.loc[r, c])
+            for r in corrs.index
+            for c in corrs.columns
+        ]
+        corrs_list = [(r, c, v) for r, c, v in corrs_list
+                      if not np.isnan(v) and abs(v) > 0.1]
+        corrs_list = sorted(corrs_list, key=lambda a: abs(a[2]))[::-1]
+        if len(corrs_list) > 0:
+            correlation_df = pd.DataFrame(corrs_list)
+            correlation_df.columns = ['attribute', 'outcome', 'correlation coef']
+            st.write(correlation_df)
+
+    st.markdown('---\n ### Notable correlation')
+    calc_and_show_correlation(df, 'code')
+    calc_and_show_correlation(atbat_df, 'event')

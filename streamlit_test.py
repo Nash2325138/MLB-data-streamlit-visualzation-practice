@@ -4,7 +4,7 @@ import plotly.graph_objs as go
 
 from utils import (
     filter_since_year, filter_by_wind_types, pie_distribution,
-    get_color_dict
+    get_color_dict, high_correlation
 )
 
 
@@ -49,6 +49,7 @@ def pitcher_page():
 
     st.markdown('---\n## Pitch position scatter')
     strike_zone_distribution(df, atbat_df, targets=['pitch_type', 'code', 'event'])
+    high_correlation(df, atbat_df)
 
 
 def batter_page():
@@ -71,6 +72,7 @@ def batter_page():
 
     st.markdown('---\n## Strike zone')
     strike_zone_distribution(df, atbat_df, targets=['code', 'event'])
+    high_correlation(df, atbat_df)
 
 
 def strike_zone_distribution(df, atbat_df, targets):
